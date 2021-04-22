@@ -1,0 +1,13 @@
+GET http://localhost:3000/getUrl
+
+###
+
+GET http://localhost:3000/getStreamID
+
+###
+
+GET http://localhost:3000/startListening
+
+###
+
+GET http://localhost:3000/stop
