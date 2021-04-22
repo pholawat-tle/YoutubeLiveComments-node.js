@@ -17,6 +17,14 @@ const oauth2Client = new google.auth.OAuth2(
 let liveChatId;
 let listening = false;
 
+const timer = (wait) => {
+    return new Promise((res) => {
+        setTimeout(() => {
+            res();
+        }, wait);
+    });
+};
+
 app.get('/getUrl', (req, res) => {
     res.send(
         oauth2Client.generateAuthUrl({
@@ -55,7 +63,8 @@ app.get('/startListening', async (req, res) => {
     listening = true;
     let nextPageToken;
     let pollingIntervalMillis;
-    let requestOTW = true;
+    let requestOTW = false;
+    res.send('Done');
     axios
         .get(
             `https://youtube.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=id&part=snippet&key=${secrets.OAuth2.apiKey}`,
@@ -75,45 +84,42 @@ app.get('/startListening', async (req, res) => {
             }
             nextPageToken = responseJSON.nextPageToken;
             pollingIntervalMillis = responseJSON.pollingIntervalMillis;
-            requestOTW = false;
 
             while (listening) {
                 if (!requestOTW) {
                     requestOTW = true;
-                    console.log(
-                        'In Here1',
-                        pollingIntervalMillis,
-                        nextPageToken
-                    );
-                    setTimeout(() => {
-                        console.log('In Here2');
-                        axios
-                            .get(
-                                `https://youtube.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=id&part=snippet&pageToken=${nextPageToken}&key=${secrets.OAuth2.apiKey}`,
-                                {
-                                    headers: {
-                                        Authorization: `Bearer ${oauth2Client.credentials.tokens.access_token}`,
-                                        Accept: 'application/json',
-                                    },
-                                }
-                            )
-                            .then((response) => {
-                                let responseJSON = response.data;
-                                console.log(responseJSON);
-                                nextPageToken = responseJSON.nextPageToken;
-                                pollingIntervalMillis =
-                                    responseJSON.pollingIntervalMillis;
-                                requestOTW = false;
-                            })
-                            .catch((err) => console.log(err.response));
-                    }, pollingIntervalMillis);
+                    await timer(pollingIntervalMillis);
+                    await axios
+                        .get(
+                            `https://youtube.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${liveChatId}&part=id&part=snippet&pageToken=${nextPageToken}&key=${secrets.OAuth2.apiKey}`,
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${oauth2Client.credentials.tokens.access_token}`,
+                                    Accept: 'application/json',
+                                },
+                            }
+                        )
+                        .then(function (response) {
+                            let responseJSON = response.data;
+                            for (let item of responseJSON.items) {
+                                console.log(
+                                    'Messaged Received : ' +
+                                        item.snippet.displayMessage
+                                );
+                            }
+                            nextPageToken = responseJSON.nextPageToken;
+                            pollingIntervalMillis =
+                                responseJSON.pollingIntervalMillis;
+                            requestOTW = false;
+                        })
+                        .catch((err) => console.log(err));
                 }
             }
         })
         .catch((err) => console.log(err.response));
 });
 
-app.get('/stop', () => {
+app.get('/stop', (req, res) => {
     listening = false;
     res.send('Stopped');
 });
